@@ -1,90 +1,8 @@
 import { ChatOllama } from "@langchain/ollama";
-import { DynamicTool } from "@langchain/core/tools";
 import { AgentExecutor, createReactAgent } from "langchain/agents";
 import { PromptTemplate } from "@langchain/core/prompts";
 import * as readline from "readline";
-
-// Create tools that the ReAct agent can use
-const createProductTools = () => {
-  // Tool for analyzing product features
-  const productAnalysisTool = new DynamicTool({
-    name: "analyze_product_features",
-    description:
-      "Analyzes product features, specifications, and key selling points for a given product",
-    func: async (productName: string) => {
-      return `
-PRODUCT ANALYSIS: ${productName}
-
-KEY FEATURES TO ANALYZE:
-- Price range and value proposition
-- Technical specifications
-- Build quality and materials
-- Brand reputation and warranty
-- User reviews and ratings
-- Availability and variants
-
-PLATFORM-SPECIFIC FACTORS:
-- Amazon: Prime delivery, return policy, customer reviews, seller ratings
-- Flipkart: Plus delivery, exchange offers, local service centers, payment options
-
-This analysis provides foundation for comparing ${productName} across platforms.
-      `.trim();
-    },
-  });
-
-  // Tool for price comparison research
-  const priceComparisonTool = new DynamicTool({
-    name: "research_price_trends",
-    description:
-      "Researches typical price trends and offers for products on Amazon vs Flipkart",
-    func: async (productName: string) => {
-      return `
-PRICE RESEARCH: ${productName}
-
-PRICING PATTERNS:
-- Amazon typically offers: Competitive base prices, Prime member discounts, lightning deals
-- Flipkart typically offers: Festival sales, exchange bonuses, cashback offers, EMI options
-
-FACTORS AFFECTING PRICE:
-- Seasonal demand variations
-- Stock availability
-- Seller competition
-- Platform-specific promotions
-- Brand partnerships
-
-RECOMMENDATION: Check both platforms during sales events for best deals on ${productName}.
-      `.trim();
-    },
-  });
-
-  // Tool for customer experience analysis
-  const customerExperienceTool = new DynamicTool({
-    name: "analyze_customer_experience",
-    description:
-      "Analyzes customer service, delivery, and post-purchase experience on both platforms",
-    func: async (productName: string) => {
-      return `
-CUSTOMER EXPERIENCE ANALYSIS: ${productName}
-
-AMAZON EXPERIENCE:
-✅ Pros: Prime delivery, easy returns, reliable customer service, extensive review system
-❌ Cons: Premium costs, potential counterfeit issues with third-party sellers
-
-FLIPKART EXPERIENCE:
-✅ Pros: Competitive pricing, strong local presence, flexible payment options, exchange programs
-❌ Cons: Delivery delays in some areas, inconsistent packaging
-
-CRITICAL FACTORS for ${productName}:
-- Return/exchange policy importance
-- Delivery speed requirements
-- Customer support needs
-- Payment preferences
-      `.trim();
-    },
-  });
-
-  return [productAnalysisTool, priceComparisonTool, customerExperienceTool];
-};
+import { universitySearchTool } from "./tools/university-search";
 
 class ReActProductAgent {
   private agent!: AgentExecutor; // Using definite assignment assertion
@@ -101,15 +19,13 @@ class ReActProductAgent {
   }
 
   private async initializeAgent() {
-    const tools = createProductTools();
+    const tools = [universitySearchTool];
 
     // Create a custom ReAct prompt template
     const reactPrompt = PromptTemplate.fromTemplate(`
-You are a product comparison expert using the ReAct (Reasoning and Acting) framework.
+You are an assistant that is resposible for helping the user find best universities in the given location/country.
 
-Your goal is to help users compare products between Amazon and Flipkart by reasoning through the problem and using available tools.
-
-INSTRUCTIONS:
+Instructions:
 1. ALWAYS start by reasoning about what information you need
 2. Use tools to gather specific information
 3. Observe the results and reason about next steps
@@ -119,16 +35,21 @@ INSTRUCTIONS:
 Available tools: {tools}
 Tool names: {tool_names}
 
-Use the following format:
+You must follow this process to come to conclusion:
 
-Question: the input question you must answer
-Thought: you should always think about what to do
+Question: The original question that was asked to you.
+Thought: Your thoughts about what you are doing.
 Action: the action to take, should be one of [{tool_names}]
 Action Input: the input to the action
 Observation: the result of the action
 ... (this Thought/Action/Action Input/Observation can repeat N times)
-Thought: I now know the final answer
 Final Answer: the final answer to the original input question
+
+Output format:
+1) You must only include Final answer in your response
+2) Must describe the count of total results
+3) Must be in bulletins, arranged alphabetically.
+2) Must include, country name, university name, university website link.
 
 Question: {input}
 {agent_scratchpad}
@@ -150,8 +71,8 @@ Question: {input}
     });
   }
 
-  async compareProduct(productName: string): Promise<string> {
-    const question = `Compare ${productName} between Amazon and Flipkart. I want to know which platform offers better value, considering price, delivery, customer service, and overall buying experience. Provide specific recommendations.`;
+  async searchUniversities(country: string): Promise<string> {
+    const question = `Find the best universities in ${country}. I want to know about the top universities with their details including names, websites, and locations.`;
 
     try {
       const result = await this.agent.invoke({
@@ -161,7 +82,7 @@ Question: {input}
       return result.output;
     } catch (error) {
       console.error("Error in ReAct agent:", error);
-      return `I encountered an error while analyzing ${productName}. Please make sure Ollama is running with the DeepSeek model.`;
+      return `I encountered an error while searching universities in ${country}. Please make sure Ollama is running with the DeepSeek model.`;
     }
   }
 
@@ -186,34 +107,34 @@ function askQuestion(question: string): Promise<string> {
 }
 
 async function main() {
-  console.log("🤖 ReAct Product Comparison Agent\n");
+  console.log("🤖 ReAct University Search Agent\n");
   console.log(
-    "🧠 Reasoning + Acting Framework for Intelligent Product Analysis\n"
+    "🧠 Reasoning + Acting Framework for University Discovery\n"
   );
 
   const agent = new ReActProductAgent();
   console.log(`🔧 Using: ${agent.getModelInfo()}\n`);
 
   try {
-    const productName = await askQuestion(
-      "🛍️  Enter product to compare (Amazon vs Flipkart): "
+    const country = await askQuestion(
+      "🏫 Enter country name to search for universities: "
     );
 
-    if (!productName) {
-      console.log("❌ No product name provided. Exiting...");
+    if (!country) {
+      console.log("❌ No country name provided. Exiting...");
       return;
     }
 
-    console.log(`\n🔍 Starting ReAct analysis for: "${productName}"\n`);
+    console.log(`\n🔍 Starting ReAct analysis for universities in: "${country}"\n`);
     console.log(
       "📝 The agent will reason through the problem step by step...\n"
     );
     console.log("=".repeat(80));
 
-    const result = await agent.compareProduct(productName);
+    const result = await agent.searchUniversities(country);
 
     console.log("\n" + "=".repeat(80));
-    console.log("🎯 FINAL COMPARISON RESULT:");
+    console.log("🎯 UNIVERSITY SEARCH RESULTS:");
     console.log("=".repeat(80));
     console.log(result);
     console.log("=".repeat(80));
