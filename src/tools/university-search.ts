@@ -23,3 +23,4 @@ export async function searchUniversities(
   const data = await response.json();
   return data as University[];
 }
+
