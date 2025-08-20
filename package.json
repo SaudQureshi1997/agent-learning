@@ -24,7 +24,11 @@
   "homepage": "https://github.com/SaudQureshi1997/agent-learning#readme",
   "devDependencies": {
     "@types/node": "^24.3.0",
+    "@types/puppeteer": "^5.4.7",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "puppeteer": "^24.17.0"
   }
 }
